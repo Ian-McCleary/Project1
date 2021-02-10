@@ -1,7 +1,7 @@
 /* 
  * CS:APP Data Lab 
  * 
- * <Please put your name and userid here>
+ * <Ian McCleary cs userid: mccleai>
  * 
  * bits.c - Source file with your solutions to the Lab.
  *          This is the file you will hand in to your instructor.
@@ -141,7 +141,7 @@ NOTES:
  *   Rating: 1
  */
 int bitAnd(int x, int y) {
-  return 2;
+       return~(~x | ~y);
 }
 /* 
  * getByte - Extract byte n from word x
@@ -151,8 +151,10 @@ int bitAnd(int x, int y) {
  *   Max ops: 6
  *   Rating: 2
  */
+//move byte to least significant byte(2^3) and use
+//0xFF to mask out more significant bytes.
 int getByte(int x, int n) {
-  return 2;
+  return x>>(n<<3) & 0xFF;
 }
 /* 
  * logicalShift - shift x to the right by n, using a logical shift
@@ -162,8 +164,9 @@ int getByte(int x, int n) {
  *   Max ops: 20
  *   Rating: 3 
  */
+//right shift normally and then set the leftmost bits as necessary to zero.
 int logicalShift(int x, int n) {
-  return 2;
+  return (x>>n) & ~(((0<<31) >> n) << 0);
 }
 /*
  * bitCount - returns count of number of 1's in word
@@ -172,8 +175,16 @@ int logicalShift(int x, int n) {
  *   Max ops: 40
  *   Rating: 4
  */
+//first use a mask to get the least significant bit for every 4 bytes
+//use another mask to shift x by 1, 8 times for each bit in a byte
+//This gives us the total number of 1s in each byte
+//lastly total the number of 1s for all bytes by shifting 8 bits at a time.
 int bitCount(int x) {
-  return 2;
+  int m4byte = 0x1 | (0x1 << 8) | (0x1 << 16) | (0x1 << 24);
+  int m1byte = 0xFF;
+  int sum4byte = (x & m4byte) + ((x>>1) & m4byte) + ((x>>2) & m4byte) + ((x>>3) & m4byte) + ((x>>4) & m4byte) + ((x>>5) & m4byte) + ((x>>6) & m4byte) + ((x>>7) & m4byte);
+  int sum = (sum4byte & m1byte) + ((sum4byte>>8) & m1byte) + ((sum4byte>>16) & m1byte) + ((sum4byte >> 24) & m1byte);
+  return sum;
 }
 /* 
  * bang - Compute !x without using !
@@ -183,7 +194,9 @@ int bitCount(int x) {
  *   Rating: 4 
  */
 int bang(int x) {
-  return 2;
+  int negX =  ~x+1; //(opposite sign of x) + 1
+  int bits = (negX | x) >> 31; //ouput of -1 or 0
+  return bits+1;
 }
 /* 
  * tmin - return minimum two's complement integer 
@@ -191,8 +204,9 @@ int bang(int x) {
  *   Max ops: 4
  *   Rating: 1
  */
+//left shift 1 by 31 to get the smallest possible number when 1 is in signed position
 int tmin(void) {
-  return 2;
+  return 1<<31;
 }
 /* 
  * fitsBits - return 1 if x can be represented as an 
@@ -204,7 +218,8 @@ int tmin(void) {
  *   Rating: 2
  */
 int fitsBits(int x, int n) {
-  return 2;
+  int sigM = x >> 31;
+  return !(((~x & sigM) + (x & ~sigM)) >> (n + ~0));
 }
 /* 
  * divpwr2 - Compute x/(2^n), for 0 <= n <= 30
@@ -214,8 +229,12 @@ int fitsBits(int x, int n) {
  *   Max ops: 15
  *   Rating: 2
  */
+//for positive num, x>>n
+//for negative num, (x+1)<<n-1)>>n
 int divpwr2(int x, int n) {
-    return 2;
+  int negCheck = x >> 31;
+  int y = ((negCheck & 1) << n) + negCheck;
+  return (x+y) >> n;
 }
 /* 
  * negate - return -x 
@@ -224,8 +243,9 @@ int divpwr2(int x, int n) {
  *   Max ops: 5
  *   Rating: 2
  */
+//opposite of each bit and add 1 to account for signed/unsiged difference
 int negate(int x) {
-  return 2;
+  return ~x+1;
 }
 /* 
  * isPositive - return 1 if x > 0, return 0 otherwise 
@@ -235,7 +255,8 @@ int negate(int x) {
  *   Rating: 3
  */
 int isPositive(int x) {
-  return 2;
+  int m = x>>31;
+  return !x ^ !m;
 }
 /* 
  * isLessOrEqual - if x <= y  then return 1, else return 0 
@@ -244,8 +265,16 @@ int isPositive(int x) {
  *   Max ops: 24
  *   Rating: 3
  */
+//when same sign, check if x-y is negative
+//otherwise negative is less than positive 
 int isLessOrEqual(int x, int y) {
-  return 2;
+  int signCheck = !(x>>31)^!(y>>31);
+  //different signs and x is negative outputs 1
+  int subtractOpposite = signCheck & (x>>31);
+  //same sign and difference is positive or 0 outputs 1
+  int subtractSame = !signCheck & !((y+(~x+1))>>31);
+  int result = subtractOpposite | subtractSame;
+  return result;
 }
 /*
  * ilog2 - return floor(log base 2 of x), where x > 0
@@ -254,8 +283,19 @@ int isLessOrEqual(int x, int y) {
  *   Max ops: 90
  *   Rating: 4
  */
+//find the most significant 1
 int ilog2(int x) {
-  return 2;
+  //each time check if > (prev result + 8)
+  int result = (!!(x >> 16)) << 4;
+  int calc1 = ((!!(x >> (result + 8))) << 3);
+  result = result + calc1;
+  int calc2 = ((!!(x >> (result + 4))) << 2);
+  result = result + calc2;
+  int calc3 = ((!!(x >> (result + 2))) << 1);
+  result = result + calc3;
+  int calc4 = (!!(x >> (result + 1)));
+  result = result + calc4;
+  return result;
 }
 /* 
  * float_neg - Return bit-level equivalent of expression -f for
@@ -269,7 +309,16 @@ int ilog2(int x) {
  *   Rating: 2
  */
 unsigned float_neg(unsigned uf) {
- return 2;
+  //first put 1s in the exponent bits
+  int nan = 0xFF << 23;
+  //get the fraction bits
+  int fraction = 0x7FFFFF & uf;
+  //return if fraction is not all zero while exponent is not all 1s
+  if ((nan & uf) == nan && fraction){
+    return uf;
+  }
+  //flip sign bit 
+  return uf ^ (1<<31);
 }
 /* 
  * float_i2f - Return bit-level equivalent of expression (float) x
@@ -281,7 +330,35 @@ unsigned float_neg(unsigned uf) {
  *   Rating: 4
  */
 unsigned float_i2f(int x) {
-  return 2;
+  //get the signed bit & setup constants for negative numbers, exponent, and bias
+  int signCheck = x & (1<<31);
+  int neg = 1<<31;
+  int exponent = 31;
+  int bias = 127;
+  int fraction;
+  //if x is all zeros
+  if(!x){
+    return 0;
+  }
+  //if x is all ones
+  if (x == neg){
+    return neg | ((exponent + bias) << 23);
+  }
+  //if x is negative
+  if (signCheck){
+    x = ~x +1;
+  }
+  //find the exponent
+  while (!(x & neg)){
+    x <<=1;
+    exponent-=1;
+  }
+  fraction = (((~neg) & x) >> 8);
+  if (x & 0x80 && ((fraction & 1) || ((x & 0x7f) > 0))){
+    fraction++;
+  }
+  //add each component together
+  return signCheck + ((exponent + bias) << 23) + fraction;
 }
 /* 
  * float_twice - Return bit-level equivalent of expression 2*f for
@@ -295,5 +372,18 @@ unsigned float_i2f(int x) {
  *   Rating: 4
  */
 unsigned float_twice(unsigned uf) {
-  return 2;
+  //if uf is either zero case
+  if(uf == 0 || uf == 0x80000000){
+    return uf;
+  }
+  //if uf is nan
+  if (((uf >> 23) & 0xFF) == 0xFF){
+    return uf;
+  }
+  //for small non zero values
+  if (((uf >> 23) & 0xFF) == 0x00){
+    return (uf & (1<<31)) | (uf<<1);
+  }
+  //just add 1 to the exponent 
+  return uf + (1<<23);
 }
