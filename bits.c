@@ -179,7 +179,7 @@ int logicalShift(int x, int n) {
 //use another mask to shift x by 1, 8 times for each bit in a byte
 //This gives us the total number of 1s in each byte
 //lastly total the number of 1s for all bytes by shifting 8 bits at a time.
-
+//I had some trouble with this one and got this idea from stackoverlfow
 int bitCount(int x) {
   int m4byte = 0x1 | (0x1 << 8) | (0x1 << 16) | (0x1 << 24);
   int m1byte = 0xFF;
