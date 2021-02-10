@@ -166,7 +166,7 @@ int getByte(int x, int n) {
  */
 //right shift normally and then set the leftmost bits as necessary to zero.
 int logicalShift(int x, int n) {
-  return (x>>n) & ~(((0<<31) >> n) << 0);
+  return (x>>n) & ~(((1<<31) >> n) << 1);
 }
 /*
  * bitCount - returns count of number of 1's in word
@@ -179,6 +179,7 @@ int logicalShift(int x, int n) {
 //use another mask to shift x by 1, 8 times for each bit in a byte
 //This gives us the total number of 1s in each byte
 //lastly total the number of 1s for all bytes by shifting 8 bits at a time.
+
 int bitCount(int x) {
   int m4byte = 0x1 | (0x1 << 8) | (0x1 << 16) | (0x1 << 24);
   int m1byte = 0xFF;
@@ -218,8 +219,15 @@ int tmin(void) {
  *   Rating: 2
  */
 int fitsBits(int x, int n) {
-  int sigM = x >> 31;
-  return !(((~x & sigM) + (x & ~sigM)) >> (n + ~0));
+  int nMinus = n + (~0);
+  //get the signed bit
+  int sigM = (x >> 31) & 1;
+  //create a mask of all values from signed bit
+  int m = ~(sigM + ~0);
+  //use xor and the mask to get rid of same leading bits
+  x = x ^ m;
+  //right shift n-1 times, result should be 0 so invert
+  return !(x  >> nMinus);
 }
 /* 
  * divpwr2 - Compute x/(2^n), for 0 <= n <= 30
@@ -316,9 +324,10 @@ unsigned float_neg(unsigned uf) {
   //return if fraction is not all zero while exponent is not all 1s
   if ((nan & uf) == nan && fraction){
     return uf;
+  } else{
+    //flip sign bit 
+    return uf ^ (1<<31);
   }
-  //flip sign bit 
-  return uf ^ (1<<31);
 }
 /* 
  * float_i2f - Return bit-level equivalent of expression (float) x
@@ -330,35 +339,31 @@ unsigned float_neg(unsigned uf) {
  *   Rating: 4
  */
 unsigned float_i2f(int x) {
-  //get the signed bit & setup constants for negative numbers, exponent, and bias
+  //get the signed bit & setup constants for negative numbers, exponent+bias
   int signCheck = x & (1<<31);
-  int neg = 1<<31;
-  int exponent = 31;
-  int bias = 127;
-  int fraction;
+  int exponent = 31 + 127;
   //if x is all zeros
-  if(!x){
+  if(x == 0){
     return 0;
-  }
-  //if x is all ones
-  if (x == neg){
-    return neg | ((exponent + bias) << 23);
+  }else if (x == (1<<31)){
+    //if x is all 1s
+    return (1<<31) | ((exponent) << 23);
   }
   //if x is negative
   if (signCheck){
-    x = ~x +1;
+    x = -x;
   }
-  //find the exponent
-  while (!(x & neg)){
+  //find the exponent bit
+  while (!(x & (1<<31))){
     x <<=1;
     exponent-=1;
   }
-  fraction = (((~neg) & x) >> 8);
+  int fraction = (x>>8) & 0x7FFFFF;
   if (x & 0x80 && ((fraction & 1) || ((x & 0x7f) > 0))){
-    fraction++;
+    fraction+=1;
   }
   //add each component together
-  return signCheck + ((exponent + bias) << 23) + fraction;
+  return signCheck + (exponent << 23) + fraction;
 }
 /* 
  * float_twice - Return bit-level equivalent of expression 2*f for
@@ -372,18 +377,16 @@ unsigned float_i2f(int x) {
  *   Rating: 4
  */
 unsigned float_twice(unsigned uf) {
-  //if uf is either zero case
-  if(uf == 0 || uf == 0x80000000){
-    return uf;
+  //4 cases when uf is 0, nan, very small, and expected
+  int nanCheck = (uf >> 23);
+  if(uf == 0){
+  return uf;
+  } else if ((nanCheck & 0xFF) == 0xFF){
+  return uf;
+    } else if ((nanCheck & 0xFF) == 0x00){
+  return (uf & (1<<31)) | (uf<<1);
+  } else {
+    //just add 1 to the exponent 
+    return uf + (1<<23);
   }
-  //if uf is nan
-  if (((uf >> 23) & 0xFF) == 0xFF){
-    return uf;
-  }
-  //for small non zero values
-  if (((uf >> 23) & 0xFF) == 0x00){
-    return (uf & (1<<31)) | (uf<<1);
-  }
-  //just add 1 to the exponent 
-  return uf + (1<<23);
 }
